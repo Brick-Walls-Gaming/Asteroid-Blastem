@@ -4,6 +4,7 @@ import Planet from "./modules/Planet";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Spaceship from "./modules/Spaceship";
 import Space from "./modules/Space";
+import Laser from "./modules/Laser";
 import getRandomInt from "./helpers/getRandomInt";
 
 window.addEventListener("load", init, false);
@@ -20,8 +21,17 @@ function init() {
   createPlanet();
   createSpaceship();
 
+  //createLaser();
+
   // When the mouse moves, call the given function
+  let intervalId = null
   document.addEventListener("mousemove", onMouseMove, false);
+  document.addEventListener("mousedown", () => {
+    intervalId =setInterval(createLaser, 300)});
+  document.addEventListener("mouseup", () => {
+    clearInterval(intervalId)
+    intervalId = null
+  });
 
   // start a loop that will update the objects' positions
   // and render the scene on each frame
@@ -67,9 +77,6 @@ function createScene() {
 
   // Listen for screen resize and update camera and renderer size accordingly
   window.addEventListener("resize", handleWindowResize, false);
-
-  const controls = new OrbitControls(camera, world);
-  controls.update();
 }
 
 function handleWindowResize() {
@@ -187,24 +194,61 @@ function onMouseMove(event) {
 //   return tv;
 // }
 
-function removePlanet(planet) {
-  const planetInScene = scene.getObjectById(planet.mesh.id)
-  const planetIdx = planets.indexOf(planet)
+function removeObject(object, objectArr) {
+  const objectInScene = scene.getObjectById(object.mesh.id);
+  const objectIdx = objectArr.indexOf(object);
 
-  planet.mesh.geometry.dispose();
-  planet.mesh.material.dispose();
-  scene.remove(planetInScene);
+  object.mesh.geometry.dispose();
+  object.mesh.material.dispose();
+  scene.remove(objectInScene);
 
-  if (planetIdx > -1) {
-    planets.splice(planetIdx, 1);
+  if (objectIdx > -1) {
+    objectArr.splice(objectIdx, 1);
   }
 }
 
-let counter = 1
+let laser1;
+let laser2;
+const lasers = [];
+
+function createLaser() {
+  let laser1OriginX = spaceship.mesh.position.x + 7;
+  let laserOriginY = spaceship.mesh.position.y + 40;
+  let laser2OriginX = spaceship.mesh.position.x - 7;
+
+  laser1 = new Laser();
+  laser2 = new Laser();
+
+  laser1.mesh.position.set(laser1OriginX, laserOriginY, 0);
+  laser2.mesh.position.set(laser2OriginX, laserOriginY, 0);
+  scene.add(laser1.mesh);
+  scene.add(laser2.mesh);
+
+  lasers.push(laser1);
+  lasers.push(laser2);
+
+  renderer.render(scene, camera);
+}
+
+function handleMouseDown() {
+  toggleMouseDown()
+  createLaser()
+}
+
+function handleMouseUp() {
+  toggleMouseDown()
+}
+
+function toggleMouseDown () {
+  mouseIsDown = !mouseIsDown
+}
+
+let counter = 1;
 function loop() {
   // render the sceneafdwad
   renderer.render(scene, camera);
 
+  // Planet Movement
   planets.forEach((p) => {
     p.posOrNegX === 1
       ? (p.mesh.rotation.x += 0.01)
@@ -217,20 +261,29 @@ function loop() {
     p.mesh.position.y -= 0.75;
 
     if (planets.length < 5 && counter % 240 === 0) {
-      createPlanet()
-    counter = 1
-     }
-
-    if (p.mesh.position.y <= -250) {
-
-      removePlanet(p);
+      createPlanet();
+      counter = 1;
     }
 
-    counter ++
+    if (p.mesh.position.y <= -250) {
+      removeObject(p, planets);
+    }
+
+  });
+
+  // Laser Movement
+  lasers.forEach((l) => {
+    l.mesh.position.y += 1;
+
+    if(l.mesh.position.y >= 200) {
+      removeObject(l, lasers)
+    }
   });
 
   // MOVE SPACE
-  space.mesh.rotation.x -= 0.001
+  space.mesh.rotation.x -= 0.001;
+
+  counter++;
 
   // call the loop function again
   requestAnimationFrame(loop);
