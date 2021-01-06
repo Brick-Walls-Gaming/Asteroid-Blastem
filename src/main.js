@@ -1,11 +1,36 @@
 import * as THREE from "three";
-import * as CANNON from "cannon";
 import Planet from "./modules/Planet";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Spaceship from "./modules/Spaceship";
 import Space from "./modules/Space";
 import Laser from "./modules/Laser";
 import getRandomInt from "./helpers/getRandomInt";
+
+
+let intervalId = null;
+
+
+// createScene function variables
+let scene, camera, fov, aspect, near, far, HEIGHT, WIDTH, renderer, container;
+
+// createLight variables
+let hemisphereLight, shadowLight, ambientLight;
+
+// Object variables
+let space;
+let planet;
+let spaceship;
+let laser1;
+let laser2;
+let bBoxSpaceship;
+let mouse = { x: 0, y: 0 };
+const planets = [];
+const lasers = [];
+const collidableMeshList = []
+
+// Loop variables
+let requestId;
+let counter = 1;
 
 window.addEventListener("load", init, false);
 
@@ -24,22 +49,22 @@ function init() {
   //createLaser();
 
   // When the mouse moves, call the given function
-  let intervalId = null
+
   document.addEventListener("mousemove", onMouseMove, false);
   document.addEventListener("mousedown", () => {
-    intervalId =setInterval(createLaser, 300)});
-  document.addEventListener("mouseup", () => {
-    clearInterval(intervalId)
-    intervalId = null
+    intervalId = setInterval(createLaser, 300);
   });
+  document.addEventListener("mouseup", () => {
+    clearInterval(intervalId);
+    intervalId = null;
+  });
+  // document.addEventListener("click", createLaser)
 
   // start a loop that will update the objects' positions
   // and render the scene on each frame
   loop();
 }
 
-// createScene function variables
-let scene, camera, fov, aspect, near, far, HEIGHT, WIDTH, renderer, container;
 
 function createScene() {
   // Get the width and height of the screen and use them to set up the aspect ratio of the camera and the size of the  renderer
@@ -90,8 +115,7 @@ function handleWindowResize() {
   camera.updateProjectionMatrix();
 }
 
-// createLight variables
-let hemisphereLight, shadowLight, ambientLight;
+
 
 function createLights() {
   // Hemisphere light with color gradient, first param = sky, second param = ground, third param = intensity
@@ -126,7 +150,7 @@ function createLights() {
   scene.add(hemisphereLight);
   scene.add(shadowLight);
 }
-let space;
+
 
 function createSpace() {
   space = new Space();
@@ -134,8 +158,8 @@ function createSpace() {
   scene.add(space.mesh);
 }
 
-let planet;
-const planets = [];
+
+
 
 function createPlanet() {
   const horizontalPos = getRandomInt(-250, 250);
@@ -148,7 +172,7 @@ function createPlanet() {
   planets.push(planet);
 }
 
-let spaceship;
+
 
 function createSpaceship() {
   spaceship = new Spaceship();
@@ -158,15 +182,6 @@ function createSpaceship() {
   scene.add(spaceship.mesh);
 }
 
-// function getMousePos(canvas, evt) {
-//   const rect = canvas.getBoundingClientRect();
-//   return {
-//     x: evt.clientX - rect.left,
-//     y: evt.clientY - rect.top,
-//   };
-// }
-
-let mouse = { x: 0, y: 0 };
 function onMouseMove(event) {
   // Update the mouse variable
   event.preventDefault();
@@ -185,15 +200,6 @@ function onMouseMove(event) {
   //	mouseMesh.position.set(event.clientX, event.clientY, 0);
 }
 
-// function normalize(v, vmin, vmax, tmin, tmax) {
-//   const nv = Math.max(Math.min(v, vmax), vmin);
-//   const dv = vmax - vmin;
-//   const pc = (nv - vmin) / dv;
-//   const dt = tmax - tmin;
-//   const tv = tmin + pc * dt;
-//   return tv;
-// }
-
 function removeObject(object, objectArr) {
   const objectInScene = scene.getObjectById(object.mesh.id);
   const objectIdx = objectArr.indexOf(object);
@@ -207,13 +213,11 @@ function removeObject(object, objectArr) {
   }
 }
 
-let laser1;
-let laser2;
-const lasers = [];
+
 
 function createLaser() {
   let laser1OriginX = spaceship.mesh.position.x + 7;
-  let laserOriginY = spaceship.mesh.position.y + 40;
+  let laserOriginY = spaceship.mesh.position.y + 45;
   let laser2OriginX = spaceship.mesh.position.x - 7;
 
   laser1 = new Laser();
@@ -230,23 +234,15 @@ function createLaser() {
   renderer.render(scene, camera);
 }
 
-function handleMouseDown() {
-  toggleMouseDown()
-  createLaser()
-}
 
-function handleMouseUp() {
-  toggleMouseDown()
-}
-
-function toggleMouseDown () {
-  mouseIsDown = !mouseIsDown
-}
-
-let counter = 1;
 function loop() {
   // render the sceneafdwad
   renderer.render(scene, camera);
+
+  // collisions
+  if(spaceship) {
+    bBoxSpaceship = new THREE.Box3().setFromObject(spaceship.mesh);
+  }
 
   // Planet Movement
   planets.forEach((p) => {
@@ -260,6 +256,8 @@ function loop() {
 
     p.mesh.position.y -= 0.75;
 
+    p.bBox = new THREE.Box3().setFromObject(p.mesh);
+
     if (planets.length < 5 && counter % 240 === 0) {
       createPlanet();
       counter = 1;
@@ -269,15 +267,17 @@ function loop() {
       removeObject(p, planets);
     }
 
+    if(bBoxSpaceship.intersectsBox(p.bBox)) {console.log('SPACESHIP COLLISION')}
   });
 
   // Laser Movement
   lasers.forEach((l) => {
     l.mesh.position.y += 1;
 
-    if(l.mesh.position.y >= 200) {
-      removeObject(l, lasers)
+    if (l.mesh.position.y >= 200) {
+      removeObject(l, lasers);
     }
+    l.bBox = new THREE.Box3().setFromObject(l.mesh)
   });
 
   // MOVE SPACE
@@ -286,5 +286,5 @@ function loop() {
   counter++;
 
   // call the loop function again
-  requestAnimationFrame(loop);
+  requestId = requestAnimationFrame(loop);
 }
