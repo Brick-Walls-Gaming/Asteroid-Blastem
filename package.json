@@ -26,6 +26,7 @@
     "webpack-dev-server": "^3.11.1"
   },
   "dependencies": {
+    "ammo.js": "github:kripken/ammo.js",
     "cannon": "^0.6.2",
     "copy-webpack-plugin": "^7.0.0",
     "imagemin-webpack-plugin": "^2.4.2",
