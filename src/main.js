@@ -137,6 +137,7 @@ function updatePhysics(deltaTime) {
       //objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
     }
   }
+  detectCollision();
 }
 
 function createScene() {
@@ -206,14 +207,6 @@ function handleKeyDown(event) {
 
     case 68: //D: RIGHT
       moveDirection.right = 1;
-      break;
-
-    case 84: //T
-      checkContact();
-      break;
-
-    case 74: //J
-      jump();
       break;
   }
 }
@@ -343,23 +336,11 @@ function createSpaceship() {
   scene.add(spaceship.mesh);
 }
 
-// function onMouseMove(event) {
-//   // Update the mouse variable
-//   event.preventDefault();
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+function removeSpaceShip() {
+  const spaceshipInScene = scene.getObjectById(spaceship.mesh.id);
 
-//   // Make the ship follow the mouse
-//   const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
-//   vector.unproject(camera);
-//   const dir = vector.sub(camera.position).normalize();
-//   const distance = -camera.position.z / dir.z;
-//   const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-//   spaceship.mesh.position.copy(pos);
-
-//   // Make the sphere follow the mouse
-//   //	mouseMesh.position.set(event.clientX, event.clientY, 0);
-// }
+  scene.remove(spaceshipInScene);
+}
 
 function removeObject(object, objectArr) {
   const objectInScene = scene.getObjectById(object.mesh.id);
@@ -467,86 +448,97 @@ function createLaser() {
   physicsWorld.addRigidBody(body2);
   laser2.mesh.userData.physicsBody = body2;
 
-  // rigidBodies.push(laser1.mesh)
-  // rigidBodies.push(laser2.mesh)
+  rigidBodies.push(laser1.mesh);
+  rigidBodies.push(laser2.mesh);
+
+  body1.threeObject = laser1;
+  body2.threeObject = laser2;
 
   renderer.render(scene, camera);
 }
 
 function loop() {
-  let deltaTime = clock.getDelta();
-
-  moveLaser();
-
-  updatePhysics(deltaTime);
-
-  if (moveDirection.right === 1) {
-    spaceship.mesh.position.x += 3;
-  }
-  if (moveDirection.left === 1) {
-    spaceship.mesh.position.x -= 3;
-  }
-  if (moveDirection.forward === 1) {
-    spaceship.mesh.position.y += 3;
-  }
-  if (moveDirection.back === 1) {
-    spaceship.mesh.position.y -= 3;
-  }
-
-  // render the sceneafdwad
-  renderer.render(scene, camera);
-
-  // collisions
   if (spaceship) {
-    bBoxSpaceship = new THREE.Box3().setFromObject(spaceship.mesh);
-    //console.log(bBoxSpaceship);
-  }
+    let deltaTime = clock.getDelta();
 
-  // Planet Movement
-  planets.forEach((p) => {
-    p.posOrNegX === 1
-      ? (p.mesh.rotation.x += 0.01)
-      : (p.mesh.rotation.x -= 0.01);
-    // p.posOrNegY === 1 ? (p.mesh.rotation.y += 0.01) : (p.mesh.rotation.y -= 0.01);
-    p.posOrNegZ === 1
-      ? (p.mesh.rotation.z += 0.01)
-      : (p.mesh.rotation.z -= 0.01);
+    moveLaser();
 
-    p.mesh.position.y -= 0.75;
+    updatePhysics(deltaTime);
 
-    p.bBox = new THREE.Box3().setFromObject(p.mesh);
-
-    if (planets.length < 5 && counter % 240 === 0) {
-      createPlanet();
-      counter = 1;
+    if (moveDirection.right === 1) {
+      spaceship.mesh.position.x += 3;
+    }
+    if (moveDirection.left === 1) {
+      spaceship.mesh.position.x -= 3;
+    }
+    if (moveDirection.forward === 1) {
+      spaceship.mesh.position.y += 3;
+    }
+    if (moveDirection.back === 1) {
+      spaceship.mesh.position.y -= 3;
     }
 
-    if (p.mesh.position.y <= -250 || p.mesh.position.y >= 300) {
-      removeObject(p, planets);
+    // render the sceneafdwad
+    renderer.render(scene, camera);
+
+    // collisions
+    if (spaceship) {
+      bBoxSpaceship = new THREE.Box3().setFromObject(spaceship.mesh);
+      //console.log(bBoxSpaceship);
     }
 
-    if (bBoxSpaceship.intersectsBox(p.bBox)) {
-      console.log("SPACESHIP COLLISION");
-    }
-  });
+    // Planet Movement
+    planets.forEach((p) => {
+      p.posOrNegX === 1
+        ? (p.mesh.rotation.x += 0.01)
+        : (p.mesh.rotation.x -= 0.01);
+      // p.posOrNegY === 1 ? (p.mesh.rotation.y += 0.01) : (p.mesh.rotation.y -= 0.01);
+      p.posOrNegZ === 1
+        ? (p.mesh.rotation.z += 0.01)
+        : (p.mesh.rotation.z -= 0.01);
 
-  // Laser Movement
-  lasers.forEach((l) => {
-    l.mesh.position.y += 1;
+      p.mesh.position.y -= 0.75;
 
-    if (l.mesh.position.y >= 200) {
-      removeObject(l, lasers);
-    }
-    l.bBox = new THREE.Box3().setFromObject(l.mesh);
-  });
+      p.bBox = new THREE.Box3().setFromObject(p.mesh);
+      //console.log(p.mesh.geometry.vertices)
 
-  // MOVE SPACE
-  space.mesh.rotation.x -= 0.001;
+      if (planets.length < 5 && counter % 240 === 0) {
+        createPlanet();
+        counter = 1;
+      }
 
-  counter++;
+      if (
+        p.mesh.position.y <= -250 ||
+        p.mesh.position.y >= 250 ||
+        p.mesh.position.z <= -5 ||
+        p.mesh.position.z >= 5
+      ) {
+        removeObject(p, planets);
+      }
 
-  // call the loop function again
-  requestId = requestAnimationFrame(loop);
+      if (bBoxSpaceship.intersectsBox(p.bBox)) {
+        removeSpaceShip();
+      }
+    });
+
+    // Laser Movement
+    lasers.forEach((l) => {
+      l.mesh.position.y += 1;
+
+      if (l.mesh.position.y >= 200) {
+        removeObject(l, lasers);
+      }
+      l.bBox = new THREE.Box3().setFromObject(l.mesh);
+    });
+
+    // MOVE SPACE
+    space.mesh.rotation.x -= 0.001;
+
+    counter++;
+
+    // call the loop function again
+    requestId = requestAnimationFrame(loop);
+  } else cancelAnimationFrame(requestId);
 }
 
 function moveLaser() {
@@ -582,6 +574,43 @@ function moveLaser() {
 
         ms.setWorldTransform(tmpTrans);
       }
+    }
+  }
+}
+
+function detectCollision() {
+  let dispatcher = physicsWorld.getDispatcher();
+  let numManifolds = dispatcher.getNumManifolds();
+
+  for (let i = 0; i < numManifolds; i++) {
+    let contactManifold = dispatcher.getManifoldByIndexInternal(i);
+
+    let rb0 = AMMO.castObject(contactManifold.getBody0(), AMMO.btRigidBody);
+    let rb1 = AMMO.castObject(contactManifold.getBody1(), AMMO.btRigidBody);
+    let threeObject0 = rb0.threeObject;
+    let threeObject1 = rb1.threeObject;
+    if (!threeObject0 && !threeObject1) continue;
+    let userData0 = threeObject0 ? threeObject0.userData : null;
+    let userData1 = threeObject1 ? threeObject1.userData : null;
+    let tag0 = userData0 ? userData0.tag : "none";
+    let tag1 = userData1 ? userData1.tag : "none";
+
+    let numContacts = contactManifold.getNumContacts();
+
+    for (let j = 0; j < numContacts; j++) {
+      let contactPoint = contactManifold.getContactPoint(j);
+      let distance = contactPoint.getDistance();
+
+      if (distance > 0.0) continue;
+      let velocity0 = rb0.getLinearVelocity();
+      let velocity1 = rb1.getLinearVelocity();
+      let worldPos0 = contactPoint.get_m_positionWorldOnA();
+      let worldPos1 = contactPoint.get_m_positionWorldOnB();
+      let localPos0 = contactPoint.get_m_localPointA();
+      let localPos1 = contactPoint.get_m_localPointB();
+
+      removeObject(threeObject0, lasers);
+      removeObject(threeObject1, planets);
     }
   }
 }
