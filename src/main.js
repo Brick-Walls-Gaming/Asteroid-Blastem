@@ -19,6 +19,7 @@ let // physics variables
   tmpQuat = new THREE.Quaternion(),
   ammoTmpPos = null,
   ammoTmpQuat = null,
+  spaceshipMoveDirection = { left: 0, right: 0, forward: 0, back: 0 },
   // createScene function variables
   scene,
   camera,
@@ -194,19 +195,19 @@ function handleKeyDown(event) {
 
   switch (keyCode) {
     case 87: //W: FORWARD
-      moveDirection.forward = 1;
+      spaceshipMoveDirection.forward = 3;
       break;
 
     case 83: //S: BACK
-      moveDirection.back = 1;
+      spaceshipMoveDirection.back = 3;
       break;
 
     case 65: //A: LEFT
-      moveDirection.left = 1;
+      spaceshipMoveDirection.left = 3;
       break;
 
     case 68: //D: RIGHT
-      moveDirection.right = 1;
+      spaceshipMoveDirection.right = 3;
       break;
   }
 }
@@ -216,19 +217,19 @@ function handleKeyUp(event) {
 
   switch (keyCode) {
     case 87: //W: FORWARD
-      moveDirection.forward = 0;
+      spaceshipMoveDirection.forward = 0;
       break;
 
     case 83: //S: BACK
-      moveDirection.back = 0;
+      spaceshipMoveDirection.back = 0;
       break;
 
     case 65: //A: LEFT
-      moveDirection.left = 0;
+      spaceshipMoveDirection.left = 0;
       break;
 
     case 68: //D: RIGHT
-      moveDirection.right = 0;
+      spaceshipMoveDirection.right = 0;
       break;
   }
 }
@@ -326,32 +327,94 @@ function createPlanet() {
   planet.mesh.userData.physicsBody = body;
 
   body.threeObject = planet;
+
+  planet.mesh.userData.tag = "planet";
 }
 
 function createSpaceship() {
+  let mass = 1;
   spaceship = new Spaceship();
 
   spaceship.mesh.position.y -= 10;
 
   scene.add(spaceship.mesh);
+
+  let transform = new AMMO.btTransform();
+  transform.setIdentity();
+  transform.setOrigin(
+    new AMMO.btVector3(
+      spaceship.mesh.position.x,
+      spaceship.mesh.position.y,
+      spaceship.mesh.position.z
+    )
+  );
+  transform.setRotation(
+    new AMMO.btQuaternion(
+      spaceship.mesh.quaternion.x,
+      spaceship.mesh.quaternion.y,
+      spaceship.mesh.quaternion.z,
+      spaceship.mesh.quaternion.w
+    )
+  );
+  let motionState = new AMMO.btDefaultMotionState(transform);
+
+  let colShape = new AMMO.btBoxShape(new AMMO.btVector3(20, 45, 20));
+  colShape.setMargin(0.05);
+
+  let localInertia = new AMMO.btVector3(0, 0, 0);
+  colShape.calculateLocalInertia(mass, localInertia);
+
+  let rbInfo = new AMMO.btRigidBodyConstructionInfo(
+    mass,
+    motionState,
+    colShape,
+    localInertia
+  );
+
+  let body = new AMMO.btRigidBody(rbInfo);
+
+  body.setActivationState(STATE.DISABLE_DEACTIVATION);
+  body.setCollisionFlags(FLAGS.CF_KINEMATIC_OBJECT);
+
+  physicsWorld.addRigidBody(body);
+  spaceship.mesh.userData.physicsBody = body;
+
+  rigidBodies.push(spaceship.mesh);
+
+  body.threeObject = spaceship;
+
+  spaceship.mesh.userData.tag = "spaceship";
 }
 
 function removeSpaceShip() {
   const spaceshipInScene = scene.getObjectById(spaceship.mesh.id);
+  const rbIdx = rigidBodies.indexOf(spaceship.mesh);
 
   scene.remove(spaceshipInScene);
+  //physicsWorld.destroy(spaceship.mesh.userData.body);
+
+  if (rbIdx > -1) {
+    rigidBodies.splice(rbIdx, 1);
+  }
 }
 
 function removeObject(object, objectArr) {
-  const objectInScene = scene.getObjectById(object.mesh.id);
-  const objectIdx = objectArr.indexOf(object);
+  if (object) {
+    const objectInScene = scene.getObjectById(object.mesh.id);
+    const objectIdx = objectArr.indexOf(object);
+    const rbIdx = rigidBodies.indexOf(object.mesh);
 
-  object.mesh.geometry.dispose();
-  object.mesh.material.dispose();
-  scene.remove(objectInScene);
+    object.mesh.geometry.dispose();
+    object.mesh.material.dispose();
+    scene.remove(objectInScene);
+    //physicsWorld.destroy(object.mesh.userData.body)
 
-  if (objectIdx > -1) {
-    objectArr.splice(objectIdx, 1);
+    if (objectIdx > -1) {
+      objectArr.splice(objectIdx, 1);
+    }
+    if (rbIdx > -1) {
+      rigidBodies.splice(rbIdx, 1);
+    }
   }
 }
 
@@ -454,6 +517,9 @@ function createLaser() {
   body1.threeObject = laser1;
   body2.threeObject = laser2;
 
+  laser1.mesh.userData.tag = "laser";
+  laser2.mesh.userData.tag = "laser";
+
   renderer.render(scene, camera);
 }
 
@@ -461,22 +527,24 @@ function loop() {
   if (spaceship) {
     let deltaTime = clock.getDelta();
 
+    moveSpaceship();
+
     moveLaser();
 
     updatePhysics(deltaTime);
 
-    if (moveDirection.right === 1) {
-      spaceship.mesh.position.x += 3;
-    }
-    if (moveDirection.left === 1) {
-      spaceship.mesh.position.x -= 3;
-    }
-    if (moveDirection.forward === 1) {
-      spaceship.mesh.position.y += 3;
-    }
-    if (moveDirection.back === 1) {
-      spaceship.mesh.position.y -= 3;
-    }
+    // if (moveDirection.right === 1) {
+    //   spaceship.mesh.position.x += 3;
+    // }
+    // if (moveDirection.left === 1) {
+    //   spaceship.mesh.position.x -= 3;
+    // }
+    // if (moveDirection.forward === 1) {
+    //   spaceship.mesh.position.y += 3;
+    // }
+    // if (moveDirection.back === 1) {
+    //   spaceship.mesh.position.y -= 3;
+    // }
 
     // render the sceneafdwad
     renderer.render(scene, camera);
@@ -516,9 +584,9 @@ function loop() {
         removeObject(p, planets);
       }
 
-      if (bBoxSpaceship.intersectsBox(p.bBox)) {
-        removeSpaceShip();
-      }
+      // if (bBoxSpaceship.intersectsBox(p.bBox)) {
+      //   removeSpaceShip();
+      // }
     });
 
     // Laser Movement
@@ -590,8 +658,8 @@ function detectCollision() {
     let threeObject0 = rb0.threeObject;
     let threeObject1 = rb1.threeObject;
     if (!threeObject0 && !threeObject1) continue;
-    let userData0 = threeObject0 ? threeObject0.userData : null;
-    let userData1 = threeObject1 ? threeObject1.userData : null;
+    let userData0 = threeObject0 ? threeObject0.mesh.userData : null;
+    let userData1 = threeObject1 ? threeObject1.mesh.userData : null;
     let tag0 = userData0 ? userData0.tag : "none";
     let tag1 = userData1 ? userData1.tag : "none";
 
@@ -609,8 +677,67 @@ function detectCollision() {
       let localPos0 = contactPoint.get_m_localPointA();
       let localPos1 = contactPoint.get_m_localPointB();
 
-      removeObject(threeObject0, lasers);
-      removeObject(threeObject1, planets);
+      if (tag0 === "planet" && tag1 === "planet") {
+        break;
+      }
+
+      console.log(rb0.threeObject, rb1.threeObject);
+
+      switch (tag0) {
+        case "laser":
+          removeObject(threeObject0, lasers);
+          break;
+        case "planet":
+          removeObject(threeObject0, planets);
+          break;
+        case "spaceship":
+          removeSpaceShip();
+          break;
+      }
+      switch (tag1) {
+        case "laser":
+          removeObject(threeObject1, lasers);
+          break;
+        case "planet":
+          removeObject(threeObject1, planets);
+          break;
+        case "spaceship":
+          removeSpaceShip();
+          break;
+      }
     }
+  }
+}
+
+function moveSpaceship() {
+  let scalingFactor = 0.3;
+
+  let moveX = spaceshipMoveDirection.right - spaceshipMoveDirection.left;
+  let moveZ = 0;
+  let moveY = spaceshipMoveDirection.forward - spaceshipMoveDirection.back;
+
+  let translateFactor = tmpPos.set(moveX, moveY, moveZ);
+
+  translateFactor.multiplyScalar(scalingFactor);
+
+  spaceship.mesh.translateX(translateFactor.x);
+  spaceship.mesh.translateY(translateFactor.y);
+  spaceship.mesh.translateZ(translateFactor.z);
+
+  spaceship.mesh.getWorldPosition(tmpPos);
+  spaceship.mesh.getWorldQuaternion(tmpQuat);
+
+  let physicsBody = spaceship.mesh.userData.physicsBody;
+
+  let ms = physicsBody.getMotionState();
+  if (ms) {
+    ammoTmpPos.setValue(tmpPos.x, tmpPos.y, tmpPos.z);
+    ammoTmpQuat.setValue(tmpQuat.x, tmpQuat.y, tmpQuat.z, tmpQuat.w);
+
+    tmpTrans.setIdentity();
+    tmpTrans.setOrigin(ammoTmpPos);
+    tmpTrans.setRotation(ammoTmpQuat);
+
+    ms.setWorldTransform(tmpTrans);
   }
 }
